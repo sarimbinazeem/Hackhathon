@@ -1,158 +1,237 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { v4 as uuidv4 } from "uuid";
 import { Tldraw } from "tldraw";
 import "tldraw/tldraw.css";
 
+import type { Node, NodeType } from "../lib/nodeStore";
 import { addEvent } from "../lib/eventStore";
-import { addLink, getLinks } from "../lib/linkStore";
+import { addNode, getNodes, updateNodePosition } from "../lib/nodeStore";
 
-type Task = {
- id: string;
- title: string;
- author: string;
- type: string;
-};
-
-export default function CanvasArea({
- tasks,
- setTasks
-}: {
- tasks: Task[];
- setTasks: React.Dispatch<React.SetStateAction<Task[]>>;
-}) {
+export default function CanvasArea() {
 
  const [input, setInput] = useState("");
- const [links, setLinks] = useState<any[]>([]);
+ const [nodes, setNodes] = useState<Node[]>([]);
+ const [draggingId, setDraggingId] = useState<string | null>(null);
 
- // refresh links UI
+ const socketRef = useRef<WebSocket | null>(null);
+
+ // WebSocket (optional safe)
+ useEffect(() => {
+  const ws = new WebSocket("ws://localhost:8080");
+
+  ws.onmessage = (event) => {
+   const data = JSON.parse(event.data);
+
+   if (data.type === "NODE_CREATED") {
+    const exists = getNodes().some(n => n.id === data.payload.id);
+    if (!exists) {
+     addNode(data.payload);
+     setNodes([...getNodes()]);
+    }
+   }
+
+   if (data.type === "NODE_MOVED") {
+    updateNodePosition(
+     data.payload.id,
+     data.payload.x,
+     data.payload.y
+    );
+    setNodes([...getNodes()]);
+   }
+  };
+
+  socketRef.current = ws;
+  return () => ws.close();
+ }, []);
+
  useEffect(() => {
   const interval = setInterval(() => {
-   setLinks([...getLinks()]);
-  }, 500);
+   setNodes([...getNodes()]);
+  }, 200);
 
   return () => clearInterval(interval);
  }, []);
 
- const classify = (text: string) => {
-  const lower = text.toLowerCase();
-
-  if (lower.includes("build") || lower.includes("create")) {
-   return "Action Item";
-  }
-
-  if (lower.includes("decide") || lower.includes("finalize")) {
-   return "Decision";
-  }
-
-  if (lower.includes("why") || lower.includes("what if")) {
-   return "Question";
-  }
-
-  return "Idea";
- };
-
- const addTask = () => {
+ const classify = (text: string): NodeType => {
+   const t = text.toLowerCase().trim();
+  
+   // TASK (action verbs including MAKE)
+   if (
+    t.includes("build") ||
+    t.includes("create") ||
+    t.includes("make") ||
+    t.includes("prepare") ||
+    t.includes("cook") ||
+    t.includes("implement") ||
+    t.includes("develop") ||
+    t.includes("add") ||
+    t.includes("fix")
+   ) {
+    return "task";
+   }
+  
+   // DECISION / PLANNING
+   if (
+    t.includes("decide") ||
+    t.includes("choose") ||
+    t.includes("select") ||
+    t.includes("finalize") ||
+    t.includes("pick")
+   ) {
+    return "decision";
+   }
+  
+   // RISK / ISSUE
+   if (
+    t.includes("risk") ||
+    t.includes("problem") ||
+    t.includes("issue") ||
+    t.includes("bug") ||
+    t.includes("failure")
+   ) {
+    return "risk";
+   }
+  
+   // QUESTION → decision (important for brainstorming tools)
+   if (
+    t.includes("why") ||
+    t.includes("how") ||
+    t.includes("?")
+   ) {
+    return "decision";
+   }
+  
+   // fallback
+   return "idea";
+  };
+ const addCanvasNode = () => {
   if (!input.trim()) return;
 
-  const type = classify(input);
-
-  const newTask = {
+  const newNode: Node = {
    id: uuidv4(),
-   title: input,
-   author: "Sarim",
-   type
+   text: input,
+   x: Math.random() * 400 + 120,
+   y: Math.random() * 300 + 120,
+   type: classify(input)
   };
 
-  setTasks([...tasks, newTask]);
+  addNode(newNode);
 
   addEvent({
    id: uuidv4(),
-   type: "TASK_CREATED",
-   payload: newTask,
+   type: "NODE_CREATED",
+   payload: newNode,
    timestamp: Date.now()
   });
+
+  socketRef.current?.send(
+   JSON.stringify({
+    type: "NODE_CREATED",
+    payload: newNode
+   })
+  );
 
   setInput("");
  };
 
- // DEMO LINK (we simulate linking manually for now)
- const createDemoLink = () => {
-  const link = {
-   id: uuidv4(),
-   from: "nodeA",
-   to: "nodeB"
-  };
+ const handleMouseMove = (e: React.MouseEvent) => {
+  if (!draggingId) return;
 
-  addLink(link);
+  const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
+
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+
+  updateNodePosition(draggingId, x, y);
+
+  socketRef.current?.send(
+   JSON.stringify({
+    type: "NODE_MOVED",
+    payload: { id: draggingId, x, y }
+   })
+  );
+
+  setNodes([...getNodes()]);
+ };
+
+ // 🎨 MODERN COLOR STYLE FUNCTION
+ const getNodeStyle = (type: string) => {
+  switch (type) {
+   case "task":
+    return "bg-blue-500 text-white";
+   case "decision":
+    return "bg-purple-500 text-white";
+   case "risk":
+    return "bg-red-500 text-white";
+   default:
+    return "bg-gray-800 text-white";
+  }
  };
 
  return (
-  <div className="flex-1 p-4 bg-gray-50 relative">
+  <div className="flex-1 p-4 bg-gradient-to-br from-gray-900 via-gray-800 to-black text-white">
 
-   <h2 className="text-xl font-semibold mb-3">
-    Phase 6 — Visual Dependency Graph
+   <h2 className="text-xl font-bold mb-3 text-cyan-300">
+    Phase 10 — Modern Collaborative Canvas
    </h2>
 
    {/* INPUT */}
    <div className="flex gap-2 mb-3">
 
     <input
-     className="border p-2 flex-1 rounded"
+     className="border border-gray-600 bg-gray-900 text-white p-2 flex-1 rounded focus:outline-none focus:ring-2 focus:ring-cyan-400"
      value={input}
      onChange={(e) => setInput(e.target.value)}
-     placeholder="Type idea..."
+     placeholder="Create node..."
     />
 
     <button
-     onClick={addTask}
-     className="bg-black text-white px-3 rounded"
+     onClick={addCanvasNode}
+     className="bg-cyan-500 hover:bg-cyan-400 text-black font-bold px-4 rounded"
     >
-     Add Task
-    </button>
-
-    <button
-     onClick={createDemoLink}
-     className="border px-3 rounded"
-    >
-     Link Demo
+     Add
     </button>
 
    </div>
 
    {/* CANVAS */}
-   <div className="h-[600px] border rounded-2xl overflow-hidden relative">
+   <div
+    className="h-[650px] border border-gray-700 rounded-2xl relative overflow-hidden bg-gray-950"
+    onMouseMove={handleMouseMove}
+    onMouseUp={() => setDraggingId(null)}
+   >
 
     <Tldraw />
 
-    {/* SVG LAYER (ARROWS) */}
-    <svg className="absolute top-0 left-0 w-full h-full pointer-events-none">
-
-     {links.map((l, i) => (
-      <line
-       key={i}
-       x1={100 + i * 20}
-       y1={100}
-       x2={300}
-       y2={300}
-       stroke="black"
-       strokeWidth="2"
-      />
-     ))}
-
-    </svg>
+    {/* NODES */}
+    {nodes.map((n) => (
+     <div
+      key={n.id}
+      className={`absolute p-2 rounded shadow cursor-move text-sm font-semibold ${getNodeStyle(n.type)}`}
+      style={{
+       left: n.x,
+       top: n.y
+      }}
+      onMouseDown={() => setDraggingId(n.id)}
+      onMouseUp={() => setDraggingId(null)}
+     >
+      <div className="text-xs opacity-80">{n.type.toUpperCase()}</div>
+      <div>{n.text}</div>
+     </div>
+    ))}
 
    </div>
 
-   {/* TASKS */}
-   <div className="mt-3 p-3 border rounded bg-white">
+   {/* DEBUG */}
+   <div className="mt-3 text-sm border border-gray-700 p-2 bg-gray-900 rounded text-gray-300">
 
-    <h3 className="font-bold mb-2">Tasks</h3>
+    <h3 className="font-bold text-cyan-300">Nodes</h3>
 
-    {tasks.map(t => (
-     <div key={t.id} className="text-sm">
-      {t.title} ({t.type})
+    {nodes.map(n => (
+     <div key={n.id}>
+      {n.type}: {n.text}
      </div>
     ))}
 

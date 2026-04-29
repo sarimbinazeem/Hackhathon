@@ -8,7 +8,7 @@ import EventLog from "../components/EventLog";
 
 export default function Home() {
 
- const [tasks, setTasks] = useState<any[]>([]);
+ const [tasks] = useState<any[]>([]);
 
  return (
   <div className="min-h-screen flex flex-col">
@@ -17,10 +17,8 @@ export default function Home() {
 
    <div className="flex flex-1">
 
-    <CanvasArea
-     tasks={tasks}
-     setTasks={setTasks}
-    />
+    {/* Canvas is now self-contained (no props) */}
+    <CanvasArea />
 
     <TaskBoard tasks={tasks} />
 
