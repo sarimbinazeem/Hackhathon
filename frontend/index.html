@@ -1,0 +1,845 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LIGMA — Let's Integrate Groups, Manage Anything</title>
+    <style>
+      *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+      :root {
+        --bg:       #0a0a10;
+        --surface:  #131320;
+        --surface2: #1a1a2e;
+        --border:   #252540;
+        --purple:   #7c3aed;
+        --purple2:  #a78bfa;
+        --blue:     #0ea5e9;
+        --amber:    #f59e0b;
+        --green:    #22c55e;
+        --red:      #ef4444;
+        --slate:    #64748b;
+        --text:     #e2e8f0;
+        --text2:    #94a3b8;
+        --text3:    #475569;
+      }
+
+      body {
+        font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        height: 100vh;
+        display: grid;
+        grid-template-rows: 52px 1fr;
+        grid-template-columns: 1fr 380px;
+        overflow: hidden;
+      }
+
+      /* ── Header ─────────────────────────────────────────── */
+      header {
+        grid-column: 1 / -1;
+        background: var(--surface);
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 0 16px;
+        z-index: 10;
+      }
+      .logo { font-size: 1.1rem; font-weight: 900; color: var(--purple); letter-spacing: 3px; }
+      .logo span { color: var(--purple2); font-size: 0.65rem; font-weight: 400; letter-spacing: 1px; vertical-align: middle; margin-left: 6px; }
+      .badge {
+        padding: 2px 10px; border-radius: 999px; font-size: 0.68rem; font-weight: 700;
+        background: var(--surface2); border: 1px solid var(--border);
+      }
+      .badge.ok  { background: #14532d22; border-color: var(--green);  color: var(--green); }
+      .badge.err { background: #450a0a22; border-color: var(--red);    color: var(--red); }
+      .ml-auto { margin-left: auto; }
+
+      /* ── Left Panel ─────────────────────────────────────── */
+      #left { display: flex; flex-direction: column; overflow: hidden; border-right: 1px solid var(--border); }
+
+      #toolbar {
+        padding: 8px 12px;
+        background: var(--surface);
+        border-bottom: 1px solid var(--border);
+        display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+      }
+      .toolbar-group { display: flex; gap: 4px; align-items: center; }
+      .sep { width: 1px; height: 20px; background: var(--border); margin: 0 2px; }
+
+      input, select {
+        background: var(--bg);
+        border: 1px solid var(--border);
+        color: var(--text);
+        padding: 4px 8px;
+        border-radius: 6px;
+        font-size: 0.78rem;
+        outline: none;
+      }
+      input:focus, select:focus { border-color: var(--purple); }
+      select option { background: var(--surface2); }
+
+      button {
+        padding: 5px 13px; border-radius: 6px; border: none;
+        font-weight: 700; font-size: 0.75rem; cursor: pointer;
+        transition: opacity .15s, transform .1s;
+        white-space: nowrap;
+      }
+      button:hover { opacity: .88; }
+      button:active { transform: scale(.97); }
+      .btn-primary { background: var(--purple); color: #fff; }
+      .btn-ghost   { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+      .btn-danger  { background: #7f1d1d; color: #fca5a5; }
+      .btn-sm { padding: 3px 9px; font-size: 0.7rem; }
+
+      /* ── Canvas ─────────────────────────────────────────── */
+      #canvasWrap {
+        flex: 1; position: relative; overflow: hidden;
+        background: var(--bg); cursor: crosshair;
+      }
+      canvas { display: block; }
+
+      #editOverlay {
+        display: none;
+        position: absolute;
+        background: var(--surface2);
+        border: 2px solid var(--purple);
+        border-radius: 8px;
+        padding: 6px;
+        z-index: 20;
+      }
+      #editOverlay textarea {
+        background: transparent; border: none; color: var(--text);
+        font-size: 13px; resize: none; outline: none;
+        width: 150px; height: 65px; font-family: inherit;
+      }
+
+      /* ── Remote cursors ──────────────────────────────────── */
+      .rcursor { position: absolute; pointer-events: none; transition: transform 60ms linear; z-index: 30; }
+      .rcdot   { width: 9px; height: 9px; border-radius: 50%; background: var(--purple); }
+      .rclabel {
+        font-size: 0.6rem; background: rgba(124,58,237,.9); color: #fff;
+        padding: 1px 5px; border-radius: 4px; white-space: nowrap; margin-top: 2px;
+      }
+
+      /* ── Right Panel ────────────────────────────────────── */
+      #right { display: flex; flex-direction: column; overflow: hidden; background: var(--surface); }
+
+      #presence {
+        padding: 7px 12px; background: var(--surface2);
+        border-bottom: 1px solid var(--border);
+        min-height: 36px; display: flex; flex-wrap: wrap; gap: 4px; align-items: center;
+      }
+      .chip {
+        display: inline-flex; align-items: center; gap: 5px;
+        padding: 2px 9px; border-radius: 999px;
+        background: var(--bg); border: 1px solid var(--border); font-size: 0.68rem; font-weight: 600;
+      }
+      .chip-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); }
+      .chip-role { opacity: .55; font-size: .6rem; }
+
+      .tabs { display: flex; background: var(--surface2); border-bottom: 1px solid var(--border); }
+      .tab {
+        padding: 8px 15px; font-size: 0.73rem; cursor: pointer;
+        border-bottom: 2px solid transparent; user-select: none; color: var(--text2);
+        transition: color .15s;
+      }
+      .tab:hover { color: var(--text); }
+      .tab.on { border-bottom-color: var(--purple); color: var(--purple2); }
+
+      .pane { display: none; flex: 1; flex-direction: column; overflow: hidden; }
+      .pane.on { display: flex; }
+      .scroll { flex: 1; overflow-y: auto; padding: 6px 10px; }
+      .scroll::-webkit-scrollbar { width: 4px; }
+      .scroll::-webkit-scrollbar-track { background: transparent; }
+      .scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+      /* ── Event Log ───────────────────────────────────────── */
+      .ev-row {
+        padding: 4px 0; border-bottom: 1px solid var(--bg);
+        display: flex; gap: 8px; font-family: monospace; font-size: 0.68rem; align-items: flex-start;
+      }
+      .ev-t   { color: var(--text3); min-width: 54px; }
+      .ev-tag { font-weight: 700; padding: 1px 5px; border-radius: 3px; font-size: .62rem; }
+      .t-yjs  { background: #1e40af44; color: #60a5fa; }
+      .t-cv   { background: #06402644; color: #34d399; }
+      .t-ai   { background: #78350f44; color: #f97316; }
+      .t-err  { background: #450a0a44; color: #f87171; }
+      .t-sys  { background: var(--surface2); color: var(--text3); }
+      .ev-seq  { color: var(--text3); }
+      .ev-nid  { color: var(--slate); }
+      .ev-uid  { color: var(--purple2); }
+
+      /* ── Task Board ──────────────────────────────────────── */
+      #taskBoard { flex: 1; overflow-y: auto; padding: 8px 10px; }
+      .task {
+        background: var(--surface2); border-left: 3px solid var(--purple);
+        border-radius: 6px; padding: 9px 11px; margin-bottom: 8px;
+        font-size: 0.74rem; cursor: pointer; transition: background .15s;
+      }
+      .task:hover { background: #252540; }
+      .task.decision  { border-color: var(--blue); }
+      .task.question  { border-color: var(--amber); }
+      .task.reference { border-color: var(--slate); }
+      .task-type  { font-size: .6rem; font-weight: 800; text-transform: uppercase; color: var(--purple2); margin-bottom: 3px; }
+      .task.decision  .task-type { color: #38bdf8; }
+      .task.question  .task-type { color: #fbbf24; }
+      .task.reference .task-type { color: var(--text2); }
+      .task-text { color: var(--text); line-height: 1.4; }
+      .task-meta { color: var(--text3); font-size: .6rem; margin-top: 4px; }
+
+      .empty-state { padding: 24px 12px; text-align: center; color: var(--text3); font-size: .78rem; }
+
+      /* ── WS Debug ────────────────────────────────────────── */
+      #wsLog { font-family: monospace; font-size: .68rem; }
+
+      /* ── Join Modal ──────────────────────────────────────── */
+      #modal {
+        position: fixed; inset: 0; background: rgba(0,0,0,.7);
+        display: flex; align-items: center; justify-content: center; z-index: 100;
+      }
+      .modal-box {
+        background: var(--surface); border: 1px solid var(--border);
+        border-radius: 14px; padding: 32px; width: 360px; box-shadow: 0 24px 60px #000a;
+      }
+      .modal-logo { font-size: 1.5rem; font-weight: 900; color: var(--purple); letter-spacing: 3px; margin-bottom: 4px; }
+      .modal-sub  { color: var(--text3); font-size: .78rem; margin-bottom: 24px; }
+      .field { margin-bottom: 14px; }
+      .field label { display: block; font-size: .72rem; color: var(--text2); margin-bottom: 5px; font-weight: 600; }
+      .field input, .field select { width: 100%; padding: 8px 10px; font-size: .85rem; }
+      .modal-btn { width: 100%; padding: 10px; font-size: .9rem; margin-top: 8px; border-radius: 8px; }
+
+      /* ── Node context menu ───────────────────────────────── */
+      #ctxMenu {
+        display: none; position: absolute; z-index: 50;
+        background: var(--surface2); border: 1px solid var(--border);
+        border-radius: 8px; min-width: 160px; box-shadow: 0 8px 24px #0008;
+      }
+      .ctx-item {
+        padding: 8px 14px; font-size: .75rem; cursor: pointer;
+        display: flex; align-items: center; gap: 8px; transition: background .1s;
+      }
+      .ctx-item:hover { background: var(--bg); }
+      .ctx-item:first-child { border-radius: 8px 8px 0 0; }
+      .ctx-item:last-child  { border-radius: 0 0 8px 8px; }
+      .ctx-sep { height: 1px; background: var(--border); margin: 3px 0; }
+    </style>
+  </head>
+  <body>
+
+    <!-- ── Join Modal ──────────────────────────────────────── -->
+    <div id="modal">
+      <div class="modal-box">
+        <div class="modal-logo">LIGMA</div>
+        <div class="modal-sub">Let's Integrate Groups, Manage Anything</div>
+        <div class="field">
+          <label>Your Name</label>
+          <input id="mName" placeholder="e.g. Alice" autocomplete="off" />
+        </div>
+        <div class="field">
+          <label>Room ID</label>
+          <input id="mRoom" value="room1" autocomplete="off" />
+        </div>
+        <div class="field">
+          <label>Role</label>
+          <select id="mRole">
+            <option value="lead">Lead (full access)</option>
+            <option value="contributor" selected>Contributor</option>
+            <option value="viewer">Viewer (read only)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Server URL</label>
+          <input id="mServer" value="http://localhost:3000" />
+        </div>
+        <button class="btn-primary modal-btn" onclick="doConnect()">Join Workspace →</button>
+      </div>
+    </div>
+
+    <!-- ── Header ─────────────────────────────────────────── -->
+    <header>
+      <div class="logo">LIGMA <span>v1.0</span></div>
+      <span id="connBadge" class="badge err">DISCONNECTED</span>
+      <span id="seqBadge" class="badge">seq: 0</span>
+      <span id="roomBadge" class="badge">room: —</span>
+      <span id="userBadge" class="badge ml-auto"></span>
+    </header>
+
+    <!-- ── Canvas Panel ───────────────────────────────────── -->
+    <div id="left">
+      <div id="toolbar">
+        <div class="toolbar-group">
+          <button class="btn-primary" onclick="addNote()">＋ Sticky Note</button>
+          <button class="btn-ghost btn-sm" onclick="yjsEdit()" title="Simulate concurrent edit (CRDT test)">⚡ Yjs Edit</button>
+        </div>
+        <div class="sep"></div>
+        <div class="toolbar-group">
+          <button class="btn-ghost btn-sm" onclick="addSample('action_item')" style="border-color:#7c3aed;color:#a78bfa">Action</button>
+          <button class="btn-ghost btn-sm" onclick="addSample('decision')"    style="border-color:#0ea5e9;color:#38bdf8">Decision</button>
+          <button class="btn-ghost btn-sm" onclick="addSample('question')"    style="border-color:#f59e0b;color:#fbbf24">Question</button>
+        </div>
+        <div class="sep"></div>
+        <div class="toolbar-group">
+          <button class="btn-danger btn-sm" onclick="clearAll()">🗑 Clear</button>
+        </div>
+        <div class="sep" style="margin-left:auto"></div>
+        <div class="toolbar-group">
+          <button class="btn-ghost btn-sm" onclick="showModal()">Switch Room</button>
+        </div>
+      </div>
+
+      <div id="canvasWrap">
+        <canvas id="c"></canvas>
+        <div id="editOverlay">
+          <textarea id="editTA" onkeydown="editKeydown(event)"></textarea>
+        </div>
+      </div>
+
+      <!-- Context menu -->
+      <div id="ctxMenu">
+        <div class="ctx-item" onclick="ctxLockNode()">🔒 Lock Node (Lead only)</div>
+        <div class="ctx-sep"></div>
+        <div class="ctx-item" onclick="ctxDeleteNode()" style="color:#f87171">🗑 Delete Node</div>
+      </div>
+    </div>
+
+    <!-- ── Right Panel ────────────────────────────────────── -->
+    <div id="right">
+      <div id="presence"><span style="color:var(--text3);font-size:.72rem">No users yet…</span></div>
+      <div class="tabs">
+        <div class="tab on" onclick="switchTab('events')">📋 Event Log</div>
+        <div class="tab"    onclick="switchTab('tasks')">✅ Task Board</div>
+        <div class="tab"    onclick="switchTab('ws')">🔌 WS Debug</div>
+      </div>
+      <div id="pane-events" class="pane on">
+        <div class="scroll" id="evLog">
+          <div class="empty-state">Events will appear here…</div>
+        </div>
+      </div>
+      <div id="pane-tasks" class="pane">
+        <div id="taskBoard">
+          <div class="empty-state">AI-classified tasks will appear here.<br>Write a note on the canvas to begin.</div>
+        </div>
+      </div>
+      <div id="pane-ws" class="pane">
+        <div class="scroll" id="wsLog">
+          <div class="empty-state">WebSocket debug log…</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Scripts ───────────────────────────────────────── -->
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/yjs.js"></script>
+    <script>
+      // ── roundRect polyfill ──────────────────────────────
+      if (!CanvasRenderingContext2D.prototype.roundRect) {
+        CanvasRenderingContext2D.prototype.roundRect = function(x, y, w, h, r) {
+          r = Math.min(r || 0, w/2, h/2);
+          this.moveTo(x+r, y); this.lineTo(x+w-r, y);
+          this.arcTo(x+w, y, x+w, y+r, r); this.lineTo(x+w, y+h-r);
+          this.arcTo(x+w, y+h, x+w-r, y+h, r); this.lineTo(x+r, y+h);
+          this.arcTo(x, y+h, x, y+h-r, r); this.lineTo(x, y+r);
+          this.arcTo(x, y, x+r, y, r); this.closePath();
+        };
+      }
+
+      // ── Canvas setup ────────────────────────────────────
+      const wrap   = document.getElementById("canvasWrap");
+      const canvas = document.getElementById("c");
+      const ctx    = canvas.getContext("2d");
+      const nodes  = new Map();
+      const rcursors = new Map();
+
+      function resize() {
+        canvas.width  = wrap.clientWidth;
+        canvas.height = wrap.clientHeight;
+        draw();
+      }
+      window.addEventListener("resize", resize);
+      resize();
+
+      const INTENT_COLORS = {
+        action_item: "#7c3aed",
+        decision:    "#0ea5e9",
+        question:    "#f59e0b",
+        reference:   "#64748b",
+        none:        "#334155",
+      };
+
+      function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        // Grid
+        ctx.strokeStyle = "#1a1a2e"; ctx.lineWidth = 1;
+        for (let x = 0; x < canvas.width; x += 40) {
+          ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+        }
+        for (let y = 0; y < canvas.height; y += 40) {
+          ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+        }
+        nodes.forEach(drawNode);
+      }
+
+      function drawNode(n) {
+        const col = INTENT_COLORS[n.intent || "none"];
+        const locked = n._locked;
+        ctx.fillStyle = col + "22";
+        ctx.strokeStyle = n._highlight ? "#f97316" : locked ? "#ef4444" : col;
+        ctx.lineWidth   = n._highlight ? 3 : locked ? 2.5 : 1.5;
+        ctx.setLineDash(locked ? [5,3] : []);
+        ctx.beginPath(); ctx.roundRect(n.x, n.y, 168, 84, 9); ctx.fill(); ctx.stroke();
+        ctx.setLineDash([]);
+        // Text
+        ctx.fillStyle = "#e2e8f0"; ctx.font = "bold 12px Segoe UI,system-ui";
+        const words  = (n.text || "…").split(" ");
+        let line = "", lines = [];
+        for (const w of words) {
+          const test = line ? line + " " + w : w;
+          if (ctx.measureText(test).width > 148) { lines.push(line); line = w; }
+          else line = test;
+        }
+        lines.push(line);
+        lines.slice(0,2).forEach((l,i) => ctx.fillText(l, n.x+9, n.y+20+(i*16)));
+        // Author
+        ctx.fillStyle = "#64748b"; ctx.font = "10px Segoe UI";
+        ctx.fillText((n.author || ""), n.x+9, n.y+56);
+        // Intent badge
+        if (n.intent && n.intent !== "none") {
+          ctx.fillStyle = col;
+          ctx.fillText("⬡ " + n.intent.replace("_"," "), n.x+9, n.y+71);
+        }
+        if (locked) {
+          ctx.fillStyle = "#ef4444"; ctx.font = "11px Segoe UI";
+          ctx.fillText("🔒", n.x+148, n.y+16);
+        }
+      }
+
+      // ── State ───────────────────────────────────────────
+      let socket=null, ydoc=null, ymap=null;
+      let lastSeq=0, myUser="", myRoom="", myRole="";
+      let connected=false, syncReady=false, lastCursor=0, mySocketId=null;
+      let dragNode=null, dragOffX=0, dragOffY=0;
+      let editingNode=null, ctxNode=null;
+
+      // ── Modal ───────────────────────────────────────────
+      function showModal() {
+        document.getElementById("modal").style.display = "flex";
+      }
+
+      function doConnect() {
+        const serverUrl = document.getElementById("mServer").value.trim();
+        myRoom   = document.getElementById("mRoom").value.trim()  || "room1";
+        myUser   = document.getElementById("mName").value.trim()  || "User" + Math.random().toString(36).slice(2,5);
+        myRole   = document.getElementById("mRole").value;
+        document.getElementById("mName").value = myUser;
+        document.getElementById("modal").style.display = "none";
+
+        wsLog("sys", `Connecting to ${serverUrl} as ${myUser} (${myRole})…`);
+
+        if (socket) { socket.removeAllListeners(); socket.disconnect(); socket=null; }
+        connected=false; syncReady=false;
+
+        ydoc = new Y.Doc();
+        ymap = ydoc.getMap("canvas");
+
+        ymap.observe(evt => {
+          evt.changes.keys.forEach((change, key) => {
+            if (change.action === "delete") nodes.delete(key);
+            else nodes.set(key, ymap.get(key));
+          });
+          draw();
+        });
+
+        ydoc.on("update", (update, origin) => {
+          if (origin === "server" || !syncReady || !connected) return;
+          socket.emit("yjs:update", {
+            roomId: myRoom,
+            update: Array.from(update),
+            origin: mySocketId,
+            stateVector: Array.from(Y.encodeStateVector(ydoc)),
+          });
+        });
+
+        socket = io(serverUrl, {
+          transports: ["websocket","polling"],
+          reconnection: true, reconnectionAttempts: 10, reconnectionDelay: 1000,
+        });
+
+        socket.on("connect", () => {
+          mySocketId = socket.id;
+          wsLog("sys", `Socket: ${socket.id}`);
+          socket.emit("joinRoom", {
+            roomId: myRoom, userId: myUser, userName: myUser,
+            role: myRole, lastSeq,
+          });
+        });
+        socket.on("connect_error", err => wsLog("err", `connect_error: ${err.message}`));
+
+        socket.on("joinedRoom", data => {
+          connected=true; lastSeq=data.currentSeq;
+          document.getElementById("connBadge").textContent="CONNECTED";
+          document.getElementById("connBadge").className="badge ok";
+          document.getElementById("roomBadge").textContent="room: "+myRoom;
+          document.getElementById("seqBadge").textContent="seq: "+lastSeq;
+          document.getElementById("userBadge").textContent=`${myUser} · ${myRole}`;
+          wsLog("sys","Joined room "+myRoom+" — awaiting Yjs state…");
+        });
+
+        socket.on("disconnect", reason => {
+          connected=false; syncReady=false;
+          document.getElementById("connBadge").textContent="DISCONNECTED";
+          document.getElementById("connBadge").className="badge err";
+          wsLog("err","Disconnected: "+reason);
+        });
+
+        socket.on("yjs:fullState", ({update, seq}) => {
+          if (!update || update.length===0) { syncReady=true; wsLog("yjs","New room — sync ready"); return; }
+          try {
+            Y.applyUpdate(ydoc, new Uint8Array(update), "server");
+            wsLog("yjs",`Full state applied (${update.length}B)`);
+            socket.emit("yjs:sync", { roomId: myRoom, stateVector: Array.from(Y.encodeStateVector(ydoc)) });
+          } catch(err) { wsLog("err","fullState apply failed: "+err.message); }
+        });
+
+        socket.on("yjs:syncReply", ({update, seq}) => {
+          try {
+            if (update && update.length > 0) {
+              Y.applyUpdate(ydoc, new Uint8Array(update), "server");
+              wsLog("yjs",`Sync delta applied (${update.length}B)`);
+            } else wsLog("yjs","Already up to date");
+          } catch(err) { wsLog("err","syncReply failed: "+err.message); }
+          syncReady=true;
+          wsLog("sys","✅ Sync complete — changes will propagate");
+          if (seq > lastSeq) { lastSeq=seq; document.getElementById("seqBadge").textContent="seq: "+lastSeq; }
+        });
+
+        socket.on("yjs:update", ({update, origin}) => {
+          if (!update || update.length===0) return;
+          try {
+            Y.applyUpdate(ydoc, new Uint8Array(update), "server");
+            wsLog("yjs",`Delta from ${(origin||"?").slice(0,8)} (${update.length}B)`);
+          } catch(err) { wsLog("err","Delta failed: "+err.message); }
+        });
+
+        socket.on("canvas:event", event => {
+          if (event.seq && event.seq > lastSeq) {
+            lastSeq=event.seq;
+            document.getElementById("seqBadge").textContent="seq: "+lastSeq;
+          }
+          logEvent(event);
+          if (event.type==="NODE_MOVE" && event.payload) {
+            const n=nodes.get(event.nodeId);
+            if (n) { n.x=event.payload.x; n.y=event.payload.y; draw(); }
+          }
+        });
+
+        socket.on("canvas:ack", ({seq}) => {
+          if (seq>lastSeq) { lastSeq=seq; document.getElementById("seqBadge").textContent="seq: "+lastSeq; }
+        });
+
+        socket.on("ai:classification", event => {
+          logEvent(event);
+          const n = nodes.get(event.nodeId);
+          if (n) {
+            n.intent = event.payload?.intent;
+            ydoc.transact(() => { ymap.set(event.nodeId, {...n}); });
+            draw();
+          }
+          addTask(event);
+        });
+
+        socket.on("cursor:update", ({socketId, userName, x, y}) => {
+          if (socketId === mySocketId) return;
+          let el = rcursors.get(socketId);
+          if (!el) {
+            el = document.createElement("div"); el.className="rcursor";
+            el.innerHTML=`<div class="rcdot"></div><div class="rclabel">${userName}</div>`;
+            wrap.appendChild(el); rcursors.set(socketId, el);
+          }
+          el.style.transform=`translate(${x}px,${y}px)`;
+        });
+
+        socket.on("cursor:remove", ({socketId}) => {
+          rcursors.get(socketId)?.remove(); rcursors.delete(socketId);
+        });
+
+        socket.on("presence:update", ({users}) => {
+          const el = document.getElementById("presence");
+          if (!users || !users.length) {
+            el.innerHTML = '<span style="color:var(--text3);font-size:.72rem">No users yet…</span>';
+            return;
+          }
+          el.innerHTML = users.map(u =>
+            `<span class="chip"><span class="chip-dot"></span>${u.userName}<span class="chip-role">${u.role}</span></span>`
+          ).join("");
+        });
+
+        socket.on("eventReplay", ({events}) => {
+          wsLog("sys",`Replaying ${events.length} missed events`);
+          events.forEach(logEvent);
+          if (events.length) lastSeq = events[events.length-1].seq;
+        });
+
+        socket.on("node:aclUpdate", event => {
+          logEvent(event);
+          const n = nodes.get(event.nodeId);
+          if (n) { n._locked=true; ydoc.transact(() => { ymap.set(event.nodeId,{...n}); }); draw(); }
+        });
+
+        socket.on("error", err => wsLog("err",`${err.code}: ${err.message}`));
+      }
+
+      // ── Canvas interactions ─────────────────────────────
+      wrap.addEventListener("mousemove", e => {
+        const r=wrap.getBoundingClientRect(), mx=e.clientX-r.left, my=e.clientY-r.top;
+        if (dragNode) { dragNode.x=mx-dragOffX; dragNode.y=my-dragOffY; draw(); return; }
+        if (!socket||!connected) return;
+        const now=Date.now(); if (now-lastCursor<50) return; lastCursor=now;
+        socket.emit("cursor:move", { roomId: myRoom, x: mx, y: my });
+      });
+
+      wrap.addEventListener("mousedown", e => {
+        if (e.button===2) return;
+        if (!socket||!connected) return;
+        const r=wrap.getBoundingClientRect(), mx=e.clientX-r.left, my=e.clientY-r.top;
+        for (const key of [...nodes.keys()].reverse()) {
+          const n=nodes.get(key);
+          if (mx>=n.x && mx<=n.x+168 && my>=n.y && my<=n.y+84) {
+            dragNode=n; dragOffX=mx-n.x; dragOffY=my-n.y;
+            wrap.style.cursor="grabbing"; return;
+          }
+        }
+      });
+
+      wrap.addEventListener("mouseup", () => {
+        if (dragNode && socket && connected) {
+          const n=dragNode;
+          ydoc.transact(() => { ymap.set(n.id,{...n}); });
+          socket.emit("canvas:event",{ type:"NODE_MOVE", roomId:myRoom, nodeId:n.id, payload:{x:n.x,y:n.y} });
+        }
+        dragNode=null; wrap.style.cursor="crosshair";
+      });
+
+      wrap.addEventListener("dblclick", e => {
+        if (!socket||!connected) return;
+        const r=wrap.getBoundingClientRect(), mx=e.clientX-r.left, my=e.clientY-r.top;
+        for (const n of nodes.values()) {
+          if (mx>=n.x && mx<=n.x+168 && my>=n.y && my<=n.y+84) {
+            startEdit(n); return;
+          }
+        }
+      });
+
+      wrap.addEventListener("click", e => {
+        if (!socket||!connected) return;
+        if (e.detail>1) return;
+        document.getElementById("ctxMenu").style.display="none";
+        const r=wrap.getBoundingClientRect(), mx=e.clientX-r.left, my=e.clientY-r.top;
+        for (const n of nodes.values()) {
+          if (mx>=n.x && mx<=n.x+168 && my>=n.y && my<=n.y+84) return;
+        }
+        createNode(mx, my, "Click to edit…");
+      });
+
+      wrap.addEventListener("contextmenu", e => {
+        e.preventDefault();
+        if (!socket||!connected) return;
+        const r=wrap.getBoundingClientRect(), mx=e.clientX-r.left, my=e.clientY-r.top;
+        for (const n of nodes.values()) {
+          if (mx>=n.x && mx<=n.x+168 && my>=n.y && my<=n.y+84) {
+            ctxNode = n;
+            const menu = document.getElementById("ctxMenu");
+            menu.style.display="block"; menu.style.left=e.clientX+"px"; menu.style.top=e.clientY+"px";
+            return;
+          }
+        }
+      });
+
+      document.addEventListener("click", () => {
+        document.getElementById("ctxMenu").style.display="none";
+      });
+
+      function ctxLockNode() {
+        if (!ctxNode || !socket) return;
+        if (myRole !== "lead") { alert("Only leads can lock nodes."); return; }
+        socket.emit("node:setACL", { roomId: myRoom, nodeId: ctxNode.id, minRole: "lead" });
+        ctxNode=null;
+      }
+
+      function ctxDeleteNode() {
+        if (!ctxNode || !socket) return;
+        const n = ctxNode; ctxNode=null;
+        ydoc.transact(() => { ymap.delete(n.id); });
+        socket.emit("canvas:event",{ type:"NODE_DELETE", roomId:myRoom, nodeId:n.id, payload:{} });
+      }
+
+      // ── Node editing ────────────────────────────────────
+      function startEdit(n) {
+        editingNode = n;
+        const ov = document.getElementById("editOverlay");
+        const ta = document.getElementById("editTA");
+        ov.style.display="block";
+        ov.style.left = n.x+"px"; ov.style.top = n.y+"px";
+        ta.value = n.text || "";
+        ta.focus(); ta.select();
+      }
+
+      function commitEdit() {
+        const ov = document.getElementById("editOverlay");
+        ov.style.display="none";
+        if (!editingNode) return;
+        const newText = document.getElementById("editTA").value.trim() || "…";
+        const n = { ...editingNode, text: newText };
+        ydoc.transact(() => { ymap.set(n.id, n); });
+        socket.emit("canvas:event",{ type:"NODE_UPDATE", roomId:myRoom, nodeId:n.id, payload:n });
+        setTimeout(() => classifyNode(n.id, newText), 800);
+        editingNode=null;
+      }
+
+      function editKeydown(e) {
+        if (e.key==="Enter" && !e.shiftKey) { e.preventDefault(); commitEdit(); }
+        if (e.key==="Escape") {
+          document.getElementById("editOverlay").style.display="none";
+          editingNode=null;
+        }
+      }
+
+      // ── Create node ─────────────────────────────────────
+      const SAMPLES = {
+        action_item: ["Assign auth refactor to Dev team","Deploy backend to Render by Friday","Set up CI/CD pipeline — assign to Ops","Create Figma prototype for landing page"],
+        decision:    ["Decision: use Yjs for CRDT sync","Decision: Postgres over MongoDB for persistence","Decided: ship MVP without auth in Phase 1"],
+        question:    ["Open question: who owns the API layer?","Should we use Redis or Postgres for sessions?","Does the client need offline support?"],
+        reference:   ["Reference: check Figma specs first","See JIRA ticket LIG-42 for context","RFC: https://tools.ietf.org/html/rfc7235"],
+      };
+
+      function addSample(intent) {
+        if (!socket||!connected) { alert("Join a room first"); return; }
+        const pool = SAMPLES[intent];
+        const text = pool[Math.floor(Math.random()*pool.length)];
+        const x=60+Math.random()*(canvas.width-250), y=60+Math.random()*(canvas.height-150);
+        createNode(x, y, text);
+      }
+
+      function addNote() {
+        if (!socket||!connected) { alert("Join a room first"); return; }
+        const x=60+Math.random()*(canvas.width-250), y=60+Math.random()*(canvas.height-150);
+        createNode(x, y, "Double-click to edit…");
+      }
+
+      function createNode(x, y, text) {
+        const nodeId = "n-"+Date.now()+"-"+Math.random().toString(36).slice(2,5);
+        const node = { id:nodeId, x, y, text, author:myUser, intent:"none", ts:Date.now() };
+        ydoc.transact(() => { ymap.set(nodeId, node); });
+        socket.emit("canvas:event",{ type:"NODE_CREATE", roomId:myRoom, nodeId, payload:node });
+        setTimeout(() => classifyNode(nodeId, text), 1200);
+      }
+
+      function yjsEdit() {
+        if (!ydoc) { alert("Join a room first"); return; }
+        const keys=[...ymap.keys()];
+        if (!keys.length) { alert("Add a note first"); return; }
+        const key=keys[keys.length-1];
+        const n={...ymap.get(key), text:"Concurrent edit @ "+new Date().toLocaleTimeString()};
+        ydoc.transact(() => { ymap.set(key, n); });
+        wsLog("yjs","⚡ Simulated concurrent edit on "+key.slice(0,12));
+      }
+
+      function clearAll() {
+        if (!ydoc||!socket||!connected) return;
+        if (!confirm("Clear all nodes?")) return;
+        ydoc.transact(() => { for (const k of ymap.keys()) ymap.delete(k); });
+        nodes.clear(); draw();
+        socket.emit("canvas:event",{ type:"CANVAS_CLEAR", roomId:myRoom, nodeId:null, payload:{} });
+      }
+
+      // ── AI Classification (client-side, fast) ───────────
+      function classifyNode(nodeId, text) {
+        if (!socket||!connected) return;
+        const l=text.toLowerCase();
+        const intent =
+          l.includes("assign")||l.includes("ship")||l.includes("deploy")||
+          l.includes("refactor")||l.includes("action")||l.includes("create")||
+          l.includes("set up")||l.includes("build") ? "action_item"
+          : l.includes("should")||l.includes("?")||l.includes("open question")||
+            l.includes("does") ? "question"
+          : l.includes("decided")||l.includes("decision")||l.includes("use")||
+            l.includes("will") ? "decision"
+          : "reference";
+        socket.emit("ai:classification", { roomId:myRoom, nodeId, intent, text, author:myUser });
+        wsLog("ai",`Classified "${text.slice(0,30)}…" → ${intent}`);
+      }
+
+      // ── UI helpers ──────────────────────────────────────
+      function logEvent(ev) {
+        const el=document.getElementById("evLog");
+        // Remove empty-state placeholder
+        if (el.querySelector(".empty-state")) el.innerHTML="";
+        const row=document.createElement("div"); row.className="ev-row";
+        const tc = ev.type?.startsWith("YJS") ? "t-yjs"
+          : ev.type?.startsWith("AI")         ? "t-ai"
+          : ev.type?.startsWith("NODE")||ev.type?.startsWith("CANVAS") ? "t-cv"
+          : "t-sys";
+        row.innerHTML =
+          `<span class="ev-t">${new Date(ev.serverTimestamp||ev.timestamp||Date.now()).toLocaleTimeString()}</span>`+
+          `<span class="ev-tag ${tc}">${ev.type}</span>`+
+          (ev.seq  ? `<span class="ev-seq">#${ev.seq}</span>` : "")+
+          (ev.nodeId ? `<span class="ev-nid">${ev.nodeId.slice(0,10)}</span>` : "")+
+          (ev.userId ? `<span class="ev-uid">${ev.userId}</span>` : "");
+        el.appendChild(row); el.scrollTop=el.scrollHeight;
+        if (ev.seq) document.getElementById("seqBadge").textContent="seq: "+ev.seq;
+      }
+
+      const taskSet=new Set();
+      function addTask(ev) {
+        if (taskSet.has(ev.nodeId)) return;
+        taskSet.add(ev.nodeId);
+        const intent=ev.payload?.intent||"reference";
+        const board=document.getElementById("taskBoard");
+        if (board.querySelector(".empty-state")) board.innerHTML="";
+        const card=document.createElement("div");
+        card.className=`task ${intent==="action_item"?"":intent}`;
+        card.onclick=()=>highlightNode(ev.nodeId);
+        card.innerHTML=
+          `<div class="task-type">${intent.replace("_"," ")}</div>`+
+          `<div class="task-text">${ev.payload?.text||"—"}</div>`+
+          `<div class="task-meta">${ev.userId||"?"} · ${new Date(ev.serverTimestamp||Date.now()).toLocaleTimeString()} · click to highlight</div>`;
+        board.prepend(card);
+        // Switch to task board tab for action items
+        if (intent==="action_item") {
+          setTimeout(() => switchTab("tasks"), 300);
+        }
+      }
+
+      function highlightNode(nodeId) {
+        nodes.forEach((n,key) => { n._highlight = key===nodeId; });
+        draw();
+        setTimeout(() => {
+          const n=nodes.get(nodeId); if (n) { n._highlight=false; draw(); }
+        }, 2000);
+      }
+
+      function wsLog(type, msg) {
+        const el=document.getElementById("wsLog");
+        if (el.querySelector(".empty-state")) el.innerHTML="";
+        const row=document.createElement("div"); row.className="ev-row";
+        const tc=type==="err"?"t-err":type==="yjs"?"t-yjs":type==="ai"?"t-ai":"t-sys";
+        row.innerHTML=
+          `<span class="ev-t">${new Date().toLocaleTimeString()}</span>`+
+          `<span class="ev-tag ${tc}">${type.toUpperCase()}</span> `+
+          `<span style="color:var(--text2)">${msg}</span>`;
+        el.appendChild(row); el.scrollTop=el.scrollHeight;
+      }
+
+      function switchTab(name) {
+        document.querySelectorAll(".tab").forEach((t,i) => {
+          const names=["events","tasks","ws"];
+          t.classList.toggle("on", names[i]===name);
+        });
+        ["events","tasks","ws"].forEach(n => {
+          document.getElementById("pane-"+n).classList.toggle("on", n===name);
+        });
+      }
+    </script>
+  </body>
+</html>
