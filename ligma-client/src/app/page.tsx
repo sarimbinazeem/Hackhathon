@@ -1,21 +1,33 @@
+"use client";
+
+import { useState } from "react";
 import Navbar from "../components/Navbar";
 import CanvasArea from "../components/CanvasArea";
 import TaskBoard from "../components/TaskBoard";
 import EventLog from "../components/EventLog";
 
-export default function Home(){
-return(
-<div className="min-h-screen flex flex-col">
+export default function Home() {
 
-<Navbar/>
+ const [tasks, setTasks] = useState<any[]>([]);
 
-<div className="flex flex-1">
-<CanvasArea/>
-<TaskBoard/>
-</div>
+ return (
+  <div className="min-h-screen flex flex-col">
 
-<EventLog/>
+   <Navbar />
 
-</div>
-)
+   <div className="flex flex-1">
+
+    <CanvasArea
+     tasks={tasks}
+     setTasks={setTasks}
+    />
+
+    <TaskBoard tasks={tasks} />
+
+   </div>
+
+   <EventLog />
+
+  </div>
+ );
 }
