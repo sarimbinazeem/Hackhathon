@@ -14,4 +14,4 @@ export default function EventLog() {
 
   </div>
  );
-}fg
+}
