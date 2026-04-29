@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { addEvent } from "../lib/eventStore";
 import { v4 as uuidv4 } from "uuid";
 
 type Task = {
@@ -53,20 +54,39 @@ export default function CanvasArea({
  };
 
  const addTask = () => {
-  if (!input.trim()) return;
-
-  const type = classify(input);
-
-  const newTask: Task = {
-   id: uuidv4(),
-   title: input,
-   author: "Sarim",
-   type
+   if (!input.trim()) return;
+  
+   const type = classify(input);
+  
+   const newTask = {
+    id: uuidv4(),
+    title: input,
+    author: "Sarim",
+    type
+   };
+  
+   setTasks([...tasks, newTask]);
+  
+   // EVENT SYSTEM
+   addEvent({
+    id: uuidv4(),
+    type: "TASK_CREATED",
+    payload: newTask,
+    timestamp: Date.now()
+   });
+  
+   setInput("");
   };
 
-  setTasks([...tasks, newTask]);
-  setInput("");
- };
+
+  const linkNodes = (from: string, to: string) => {
+   addEvent({
+    id: uuidv4(),
+    type: "NODE_LINK",
+    payload: { from, to },
+    timestamp: Date.now()
+   });
+  };
 
  return (
   <div className="flex-1 p-4 bg-gray-50">
